@@ -1,0 +1,41 @@
+body {
+    margin:0px;
+    padding:0px;
+    height:100%;
+    font-family: Consolas, Courier;
+}
+
+#map {
+    border:1px solid red;
+    width:650px;
+    height:800px;
+    float:left;
+    padding:10px;
+}
+
+#container {
+    border: 1px solid green;
+    padding:10px;
+    float:right;
+}
+
+#status {
+    border:1px solid blue;
+    width:550px;
+    height:600px;
+    overflow-y:auto;
+}
+
+#controls {
+    border: 1px solid orange;
+    margin-top:10px;
+    width: 500px;
+    height: 100px;
+}
+#stats {
+    border: 1px solid orange;
+    margin-top:10px;
+    width: 500px;
+    height: 100px;
+    overflow:scroll;
+}

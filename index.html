@@ -1,0 +1,27 @@
+<html>
+<head>
+<title>Pathfinding with Genetic Algorithm</title>
+<script type="text/javascript" src="jquery-1.4.3.js"></script>
+
+<link rel="stylesheet" type="text/css" href="style.css">
+
+</head>
+
+<body>
+<div id='map'>
+    <canvas id="canvas" width="800" height="800"></canvas>
+</div>
+<div id='container'>
+<div id='status'></div>
+<div id='controls'></div>
+Paper: <a href=http://www-cvr.ai.uiuc.edu/~scandido/pdf/GApathplan.pdf>http://www-cvr.ai.uiuc.edu/~scandido/pdf/GApathplan.pdf</a>
+<div id='stats'></div>
+</div>
+
+
+</body>
+<script type="text/javascript" src="ga.js"></script>
+<script type="text/javascript">
+$(document).ready(function() {     GA.init(); });
+</script>
+</html>
