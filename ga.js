@@ -432,7 +432,7 @@ var GA = (function($, canvas, status, controls){
         var len = Math.min(this.points.length, that.points.length),
             i, totalDist = 0;
         for (i = 0; i < len; i++) {
-            totalDist += this.euclideanDistance(this.points[i], that.points[i])
+            totalDist += this.euclideanDistance(this.points[i], that.points[i]);
         }
         return totalDist;
     };
@@ -487,6 +487,20 @@ var GA = (function($, canvas, status, controls){
     self.generationLimit = 0;
     self.paused = false;
     self.crowding = false;
+    self.sharing = false;
+    self.sharingRadius = 100;
+
+    // Sharing function
+    self.sharingFn = function(p1, p2) {
+        ret = 0;
+
+        var dist = p1.distance(p2);
+        if (dist < self.sharingRadius) {
+            ret = 1 - (dist/self.sharingRadius);
+        }
+
+        return ret;
+    }
 
     self.run = function() {
         if (self.generation >= self.generationLimit || self.paused) {
@@ -494,6 +508,29 @@ var GA = (function($, canvas, status, controls){
         }
         self.generation++;
         self.updateProbs();
+
+        // Fitness sharing
+        if (self.sharing) {
+            for (var i = 0; i < self.population.length; i++) {
+                // f_{share}(i) = f_{raw}(i) / Sigma_{j=1}^{N} = sh(d_{ij})
+                var sharedFitness;
+                var sum = 0;
+
+                for (var j = 0; j < self.population.length; j++) {
+                    // A path can't share with itself
+                    if (i===j) continue;
+
+                    sum += self.sharingFn(self.population[i], self.population[j]);
+                }
+
+                sharedFitness = self.population[i].fitness / sum;
+                self.population[i].sharedFitness = sharedFitness;
+            }
+
+            for (i = 0; i < self.population.length; i++) {
+                self.population[i].fitness = self.population[i].sharedFitness;
+            }
+        }
         
         // If crowding is in use, otherwise just perform normal selection
         if (self.crowding) {
@@ -675,7 +712,16 @@ var GA = (function($, canvas, status, controls){
                 self.crowding = !self.crowding;
                 crowding.text('Toggle: Crowding off');
             });
-        $('<br/>').appendTo(controls);
+        var sharing = $('<button type="button"></button>').appendTo(controls)
+            .text('Toggle: Sharing off')
+            .toggle(function(){
+                self.sharing = !self.sharing;
+                sharing.text('Toggle: Sharing on');
+            }, function(){
+                self.sharing = !self.sharing;
+                sharing.text('Toggle: Sharing off');
+            });
+        $('<br/><br/>').appendTo(controls);
         var stats = $('<button type="button"></button>').appendTo(controls)
             .text('Show/Update stats')
             .click(function(){
