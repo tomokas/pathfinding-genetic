@@ -488,15 +488,15 @@ var GA = (function($, canvas, status, controls){
     self.paused = false;
     self.crowding = false;
     self.sharing = false;
-    self.sharingRadius = 100;
+    self.sharingRadius = 50;
 
     // Sharing function
     self.sharingFn = function(p1, p2) {
-        ret = 0;
+        var ret = 0;
 
         var dist = p1.distance(p2);
         if (dist < self.sharingRadius) {
-            ret = 1 - (dist/self.sharingRadius);
+            ret = 1 - Math.pow(dist/self.sharingRadius, 1);
         }
 
         return ret;
@@ -522,8 +522,11 @@ var GA = (function($, canvas, status, controls){
 
                     sum += self.sharingFn(self.population[i], self.population[j]);
                 }
-
-                sharedFitness = self.population[i].fitness / sum;
+                if (sum > 0) {
+                    sharedFitness = self.population[i].fitness / sum;
+                } else {
+                    sharedFitness = self.population[i].fitness;
+                }
                 self.population[i].sharedFitness = sharedFitness;
             }
 
