@@ -161,6 +161,7 @@ var GA = (function($, canvas, status, controls){
         this.col = '#' + Math.round(0xffffff * Math.random()).toString(16);
         this.start = [self.maze.start_x, self.maze.start_y];
         this.end = [self.maze.end_x, self.maze.end_y];
+        this.feasible = true;
 
         this.mutateFns = {
             SMALL : this.smallMutation, 
@@ -251,7 +252,8 @@ var GA = (function($, canvas, status, controls){
     
     // Is the arg a valid point
     Path.prototype.isValidPoint = function(p) {
-        return (p[0] > 0 && p[0] < self.maze.width && p[1] > 0 && p[1] < self.maze.height);
+        return ((p[0] > 0) && (p[0] < self.maze.width) && 
+                (p[1] > 0) && (p[1] < self.maze.height));
     };
     Path.prototype.allPointsValid = function() {
         var ret = true;
@@ -311,12 +313,18 @@ var GA = (function($, canvas, status, controls){
             // distance
             distance += Math.sqrt( Math.pow((nextPoint[0] - curPoint[0]),2) + Math.pow((nextPoint[1] - curPoint[1]),2));
             
-            if (! this.isValidPoint( nextPoint )) {
-                distance += 1000000;
-            }
+            //if (! this.isValidPoint( curPoint )) {
+            //    distance += 1000000;
+            //}
         }
         
         var collisions = self.maze.findCollisions(this.points);
+        //console.log("collisions: ", collisions);
+        if (collisions || !this.allPointsValid()) {
+            this.feasible = false;
+        } else {
+            this.feasible = true;
+        }
         
         this.fitness = -(a1*distance + a2*collisions); // inverse to enable GT comparisons
     };
@@ -440,6 +448,21 @@ var GA = (function($, canvas, status, controls){
     Path.prototype.euclideanDistance = function(p1, p2) {
         return Math.sqrt(Math.pow((p2[0]-p1[0]),2) + Math.pow((p2[1]-p1[1]),2));
     };
+    
+    // Compare the path to other, 1 if this is fittest, -1 if that is fittest, 0 if it's a draw
+    // A feasible path will always be fitter than a non-feasible path.
+    Path.prototype.compare = function(that) {
+        if (this.feasible && that.feasible) {
+            return (this.fitness > that.fitness);
+        } else if(this.feasible) {
+            return true;
+        } else if(that.feasible) {
+            return false;
+        } else {
+            // Both unfeasible
+            return (this.fitness > that.fitness);
+        }
+    }
 
     // Available mazes
     var m1 = [[173,0,45,32],[0,66,218,32],[474,0,43,161],[173,82,45,79],[196,98,107,33],[389,98,116,33],[0,195,389,32],[474,195,43,64],[496,195,151,32],[0,292,130,32],[217,292,386,32],[344,317,45,171],[173,357,44,131],[344,317,45,171],[376,389,199,33],[560,357,43,96]];
@@ -549,11 +572,11 @@ var GA = (function($, canvas, status, controls){
                 c2 = crossoverResult[1].mutate();
 
                 if ( (p1.distance(c1) + p2.distance(c2)) <= (p1.distance(c2) + p2.distance(c1))) {
-                    (c1.fitness > p1.fitness) && (self.population[i]   = c1);
-                    (c2.fitness > p2.fitness) && (self.population[i+1] = c2);
+                    (c1.compare(p1)) && (self.population[i]   = c1);
+                    (c2.compare(p2)) && (self.population[i+1] = c2);
                 } else {
-                    (c2.fitness > p1.fitness) && (self.population[i]   = c2);
-                    (c1.fitness > p2.fitness) && (self.population[i+1] = c1);
+                    (c2.compare(p1)) && (self.population[i]   = c2);
+                    (c1.compare(p2)) && (self.population[i+1] = c1);
                 }
             }
         } else {
@@ -563,8 +586,8 @@ var GA = (function($, canvas, status, controls){
                 var p1cand = [Math.floor(Math.random() * self.population.length), Math.floor(Math.random() * self.population.length)];
                 var p2cand = [Math.floor(Math.random() * self.population.length), Math.floor(Math.random() * self.population.length)];
 
-                var par1 = (self.population[p1cand[0]].fitness > self.population[p1cand[1]].fitness) ? self.population[p1cand[0]] : self.population[p1cand[1]];
-                var par2 = (self.population[p2cand[0]].fitness > self.population[p2cand[1]].fitness) ? self.population[p2cand[0]] : self.population[p2cand[1]];
+                var par1 = (self.population[p1cand[0]].compare(self.population[p1cand[1]])) ? self.population[p1cand[0]] : self.population[p1cand[1]];
+                var par2 = (self.population[p2cand[0]].compare(self.population[p2cand[1]])) ? self.population[p2cand[0]] : self.population[p2cand[1]];
 
                 var crossoverResult = par1.crossoverWith(par2);
                 var c1 = crossoverResult[0].mutate(),
@@ -601,7 +624,7 @@ var GA = (function($, canvas, status, controls){
         // Draw pop
         var min = null;
         for (i = 0; i< self.population.length; i++) {
-            if (!min || self.population[i].fitness > min.fitness) {
+            if (!min || self.population[i].compare(min)) {
                 min = self.population[i];
             }
         }
