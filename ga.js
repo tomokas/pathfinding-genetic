@@ -321,8 +321,9 @@ var GA = (function($, canvas, status, controls){
         var newAngles = this.path_angles.crossoverWith(other.path_angles);
         
         // Make the resulting path
-        var ret = new Path(newAngles);
-        return ret;
+        var c1 = new Path(newAngles[0]),
+            c2 = new Path(newAngles[1]);
+        return [c1,c2];
     };
     Path.prototype.mutate = function() {
         var p = Math.random();
@@ -685,8 +686,11 @@ var GA = (function($, canvas, status, controls){
     };
     BinaryTree.prototype.crossoverWith = function (other) {     // nicer named fn
         var ret = this.subTreeCrossover(other);
-        ret.trim();
-        return ret;
+        var c1 = ret[0],
+            c2 = ret[1];
+        c1.trim();
+        c2.trim();
+        return [c1, c2];
     };
     BinaryTree.prototype.trim = function(depth) {
         depth = depth || 0;
@@ -705,7 +709,7 @@ var GA = (function($, canvas, status, controls){
         }
     };
     BinaryTree.prototype.subTreeCrossover = function(that) {
-        // first clone (need to clone both as we use parts of both)
+        // Create clones of both, to be modified
         var thisClone = this.clone();
         var thatClone = that.clone();
         
@@ -731,6 +735,9 @@ var GA = (function($, canvas, status, controls){
             thatPointIndex--;
         });
         
+        // Store the values of thisNode
+        var thisNodeClone = thisNode.clone();
+        
         // Stop the tree from tending towards 1 angle
         if (!thisClone.leftChild || !thisClone.rightChild) {
             if (!thisClone.leftChild) {
@@ -744,16 +751,33 @@ var GA = (function($, canvas, status, controls){
             thisNode.leftChild  = thatNode.leftChild;
             thisNode.rightChild = thatNode.rightChild;
         }
-
-        return thisClone;
+        
+        if (!thatClone.leftChild || !thatClone.rightChild) {
+            if (!thatClone.leftChild) {
+                thatClone.leftChild = thisNodeClone;
+            } else {
+                thatClone.rightChild = thisNodeClone;
+            }
+        } else {
+            thatNode.data = thisNodeClone.data;
+            thatNode.leftChild = thisNodeClone.leftChild;
+            thatNode.rightChild = thisNodeClone.rightChild;
+        }
+        return [thisClone, thatClone];
     };
     BinaryTree.prototype.pprint = function() {
         var str = "[" + this.data;
+        str += ", " 
         if (this.leftChild) {
-            str += ", " + this.leftChild.pprint();
+            str += this.leftChild.pprint();
+        } else {
+            str += "[]"
         }
+        str += ", " 
         if (this.rightChild) {
-            str += ", " + this.rightChild.pprint();
+            str += this.rightChild.pprint();
+        } else {
+            str += "[]"
         }
         str += "]";
         return str;
