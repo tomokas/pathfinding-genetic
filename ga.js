@@ -486,6 +486,8 @@ var GA = (function($, canvas, status, controls){
     self.fittest = null;
     self.generationLimit = 0;
     self.paused = false;
+    self.crowding = false;
+
     self.run = function() {
         if (self.generation >= self.generationLimit || self.paused) {
             return;
@@ -663,6 +665,15 @@ var GA = (function($, canvas, status, controls){
             }, function(){
                 self.toggleDrawFittest();
                 toggle.text('Toggle: Draw all paths');
+            });
+        var crowding = $('<button type="button"></button>').appendTo(controls)
+            .text('Toggle: Crowding off')
+            .toggle(function(){
+                self.crowding = !self.crowding;
+                crowding.text('Toggle: Crowding on');
+            }, function(){
+                self.crowding = !self.crowding;
+                crowding.text('Toggle: Crowding off');
             });
         $('<br/>').appendTo(controls);
         var stats = $('<button type="button"></button>').appendTo(controls)
