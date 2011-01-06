@@ -30,7 +30,6 @@ body {
     border: 1px solid orange;
     margin-top:10px;
     width: 500px;
-    height: 100px;
 }
 #stats {
     border: 1px solid orange;
@@ -38,4 +37,7 @@ body {
     width: 500px;
     height: 100px;
     overflow:scroll;
+}
+#environment {
+    height:40px;
 }

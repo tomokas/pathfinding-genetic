@@ -3,7 +3,7 @@ var GA = (function($, canvas, status, controls){
     self.ctx = null;
     
     // Maze obj constructor
-    var Maze = function(start_x, start_y, end_x, end_y, rects, width, height) {
+    var Maze = function(start_x, start_y, end_x, end_y, rects, width, height, desc) {
         this.rects = rects;
         this.start_x = start_x;
         this.start_y = start_y;
@@ -11,6 +11,7 @@ var GA = (function($, canvas, status, controls){
         this.end_y = end_y;
         this.width = width;
         this.height = height;
+        this.desc = desc;
     };
     Maze.prototype.draw = function(ctx) {
         ctx.fillStyle = "rgb(255,0,0)";
@@ -413,15 +414,16 @@ var GA = (function($, canvas, status, controls){
     var m2 = [[0,0,525,61] ,[0,61,34,371] ,[493,61,32,371] ,[0,432,525,61] ,[194,61,17,28] ,[69,133,53,27] ,[265,117,69,30] ,[300,147,34,70] ,[334,175,54,42] ,[265,190,35,27] ,[354,217,33,15] ,[354,232,70,15] ,[334,247,54,14] ,[159,247,70,27] ,[194,274,35,100] ,[300,347,34,42] ,[334,362,36,70]];
     var m3 = [[0,0,525,61] ,[0,61,34,371] ,[493,61,32,371] ,[0,432,525,61] ,[194,61,17,28] ,[69,133,53,27] ,[265,117,69,30] ,[300,147,34,70] ,[334,175,54,42] ,[265,190,35,27] ,[354,217,33,15] ,[354,232,70,15] ,[334,247,54,14] ,[50,247,170,27] ,[194,274,35,160] ,[300,347,34,42] ,[334,362,36,70]];
     var m4 = [[127,79,357,47], [127,126,47,168], [437,126,47,168]];
-    var mazes = [
-                    new Maze(20,473, 635,16, m1, 647, 488),
-                    new Maze(89,389, 436,103, m2, 525, 493),
-                    new Maze(89,389, 436,103, m3, 525, 493),
-                    new Maze(299,30, 304,180, m4, 647, 488)
+    self.mazes = [
+                    new Maze(20,473, 635,16, m1, 647, 488, "Corridor-like environment."),
+                    new Maze(89,389, 436,103, m2, 525, 493, "Sparse environment."),
+                    new Maze(89,389, 436,103, m3, 525, 493, "Sparse environment with difficult-to-find exit from start."),
+                    new Maze(299,30, 304,180, m4, 647, 488, "'U'-shaped environment")
                 ];
 
     // GA stuff
     self.population = [];
+    self.whichMaze = 0;
     self.startPopSize = 40;
     self.reset = function() {
         self.population = [];
@@ -431,12 +433,15 @@ var GA = (function($, canvas, status, controls){
     self.toggleDrawFittest = function() {
         self.drawFittest = !self.drawFittest;
     };
-    self.start = function (which_maze, popSize) {
+    self.start = function (popSize) {
         // Initialise the maze and population, and draw for the first time
         popSize = popSize || self.startPopSize; 
-        var m = mazes[which_maze];
+        var m = self.mazes[self.whichMaze];
         self.maze = m;
         
+        // display the environment description
+        $('#environmentName').text(m.desc)
+
         for (var i = 0; i < popSize; i++) {
             self.population.push( new Path() );
         }
@@ -558,15 +563,12 @@ var GA = (function($, canvas, status, controls){
         $('#stats').html(self.stats.FITNESS_OVER_TIME.toString());
     };
     
-    self.init = function(which_maze) {
+    self.init = function() {
         var this_ref = this;
         
         // find the canvas
         self.ctx = canvas.getContext('2d');
         self.ctx.strokeStyle = '#f00';
-    
-        // default to first maze
-        which_maze = which_maze || 0;
     
         // Setup controls
         self.paused = false;
@@ -590,12 +592,12 @@ var GA = (function($, canvas, status, controls){
         $('<br/>').appendTo(controls);
         var p = $('<input type="text"/>').appendTo(controls)
             .val(self.startPopSize);
-        var s = $('<button type="button"></button>').appendTo(controls)
+        var regen = $('<button type="button"></button>').appendTo(controls)
             .text('Regen+Reset')
             .click(function(){
                 self.reset();
                 self.generationLimit = parseInt(g.val(),10);
-                self.start(0,p.val());
+                self.start(p.val());
             });
         var toggle = $('<button type="button"></button>').appendTo(controls)
             .text('Toggle: Draw all paths')
@@ -612,7 +614,28 @@ var GA = (function($, canvas, status, controls){
             .click(function(){
                 self.showStats();
             });
-        this_ref.start(which_maze);
+
+        // Add a separator
+        $('<br/><br/><div>Switch Environment:</div>').appendTo(controls);
+
+        // Switch which maze
+        var prevMaze = $('<button type="button"></button>').appendTo(controls)
+            .text("<-")
+            .click(function(){
+                if ((self.whichMaze - 1) >= 0) {
+                    self.whichMaze--;
+                    regen.click();
+                }
+            });
+        var nextMaze = $('<button type="button"></button>').appendTo(controls)
+            .text("->")
+            .click(function(){
+                if ((self.whichMaze + 1) < (self.mazes.length)) {
+                    self.whichMaze++;
+                    regen.click();
+                }
+            });
+        this_ref.start();
     };
     
     ////////////////////////////
@@ -691,7 +714,8 @@ var GA = (function($, canvas, status, controls){
         var thatPointIndex = Math.floor(Math.random() * thatClone.size());
         
         // References to the nodes to swap
-        var thisNode = null, thatNode = null;
+        var thisNode = null, 
+            thatNode = null;
         
         // Iterate through until we find the nodes we want...
         thisClone.preorderTraverse(function(node){
