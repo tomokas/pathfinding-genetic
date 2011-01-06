@@ -1,3 +1,19 @@
+// Global modifications
+
+// Fisher-Yates shuffle
+Array.prototype.shuffle = function() {
+    var i = this.length;
+    if ( i == 0 ) 
+        return false;
+    while ( --i ) {
+        var j = Math.floor( Math.random() * ( i + 1 ) );
+        var tmp = this[i];
+        this[i] = this[j];
+        this[j] = tmp;
+    }
+}
+
+// Actual GA
 var GA = (function($, canvas, status, controls){
     var self = {};
     self.ctx = null;
@@ -409,6 +425,21 @@ var GA = (function($, canvas, status, controls){
         ret = ret || new Path(newAngles);
         return ret;
     };
+    
+    // Phenotypic distance of one path from another
+    Path.prototype.distance = function(that) {
+        // Find shortest path length
+        var len = Math.min(this.points.length, that.points.length),
+            i, totalDist = 0;
+        for (i = 0; i < len; i++) {
+            totalDist += this.euclideanDistance(this.points[i], that.points[i])
+        }
+        return totalDist;
+    };
+    
+    Path.prototype.euclideanDistance = function(p1, p2) {
+        return Math.sqrt(Math.pow((p2[0]-p1[0]),2) + Math.pow((p2[1]-p1[1]),2));
+    };
 
     // Available mazes
     var m1 = [[173,0,45,32],[0,66,218,32],[474,0,43,161],[173,82,45,79],[196,98,107,33],[389,98,116,33],[0,195,389,32],[474,195,43,64],[496,195,151,32],[0,292,130,32],[217,292,386,32],[344,317,45,171],[173,357,44,131],[344,317,45,171],[376,389,199,33],[560,357,43,96]];
@@ -462,39 +493,63 @@ var GA = (function($, canvas, status, controls){
         self.generation++;
         self.updateProbs();
         
-        // Selection
-        var newPaths = [];
-        
-        for (var i = 0; i< 15; i++) {
-            var p1cand = [Math.floor(Math.random() * self.population.length), Math.floor(Math.random() * self.population.length)];
-            var p2cand = [Math.floor(Math.random() * self.population.length), Math.floor(Math.random() * self.population.length)];
-            
-            var par1 = (self.population[p1cand[0]].fitness > self.population[p1cand[1]].fitness) ? self.population[p1cand[0]] : self.population[p1cand[1]];
-            var par2 = (self.population[p2cand[0]].fitness > self.population[p2cand[1]].fitness) ? self.population[p2cand[0]] : self.population[p2cand[1]];
-            
-            var crossoverResult = par1.crossoverWith(par2);
-            var child = crossoverResult.mutate();
-            newPaths.push(child);
-        }
-        
-        // Find (unique) indices of unfit paths to replace
-        var indicesToReplace = [];
-        for (i = 0; i< newPaths.length; i++) {
-            while (true) {
-                var a = Math.floor( Math.random() * self.population.length );
-                var b = Math.floor( Math.random() * self.population.length );
-                var toReplace = self.population[a] > self.population[b] ? b : a;
-                
-                if ( $.inArray(toReplace, indicesToReplace) == -1) {
-                    indicesToReplace.push(toReplace);
-                    break;
+        // If crowding is in use, otherwise just perform normal selection
+        if (self.crowding) {
+            self.population.shuffle();
+
+            var i, p1, p2, c1, c2;
+            for (i = 0; i < self.population.length-1; i += 2) {
+                p1 = self.population[i];
+                p2 = self.population[i+1];
+
+                var crossoverResult = p1.crossoverWith(p2);
+                c1 = crossoverResult[0].mutate();
+                c2 = crossoverResult[1].mutate();
+
+                if ( (p1.distance(c1) + p2.distance(c2)) <= (p1.distance(c2) + p2.distance(c1))) {
+                    (c1.fitness > p1.fitness) && (self.population[i]   = c1);
+                    (c2.fitness > p2.fitness) && (self.population[i+1] = c2);
+                } else {
+                    (c2.fitness > p1.fitness) && (self.population[i]   = c2);
+                    (c1.fitness > p2.fitness) && (self.population[i+1] = c1);
                 }
             }
-        }
-        
-        // Reinsert back into population
-        for (i = 0; i< indicesToReplace.length; i++) {
-            self.population[indicesToReplace[i]] = newPaths[i];
+        } else {
+            // Selection
+            var newPaths = [];
+            for (var i = 0; i< 15; i++) {
+                var p1cand = [Math.floor(Math.random() * self.population.length), Math.floor(Math.random() * self.population.length)];
+                var p2cand = [Math.floor(Math.random() * self.population.length), Math.floor(Math.random() * self.population.length)];
+
+                var par1 = (self.population[p1cand[0]].fitness > self.population[p1cand[1]].fitness) ? self.population[p1cand[0]] : self.population[p1cand[1]];
+                var par2 = (self.population[p2cand[0]].fitness > self.population[p2cand[1]].fitness) ? self.population[p2cand[0]] : self.population[p2cand[1]];
+
+                var crossoverResult = par1.crossoverWith(par2);
+                var c1 = crossoverResult[0].mutate(),
+                    c2 = crossoverResult[1].mutate();
+                newPaths.push(c1);
+                newPaths.push(c2);
+            }
+
+            // Find (unique) indices of unfit paths to replace
+            var indicesToReplace = [];
+            for (i = 0; i< newPaths.length; i++) {
+                while (true) {
+                    var a = Math.floor( Math.random() * self.population.length );
+                    var b = Math.floor( Math.random() * self.population.length );
+                    var toReplace = self.population[a] > self.population[b] ? b : a;
+
+                    if ( $.inArray(toReplace, indicesToReplace) == -1) {
+                        indicesToReplace.push(toReplace);
+                        break;
+                    }
+                }
+            }
+
+            // Reinsert back into population
+            for (i = 0; i< indicesToReplace.length; i++) {
+                self.population[indicesToReplace[i]] = newPaths[i];
+            }
         }
         
         // Drawing
