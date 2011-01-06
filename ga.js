@@ -1,17 +1,9 @@
-var debug = true;
-function l(x, or) { 
-    if (debug || or) {
-        console.log(x); 
-    }
-}
 var GA = (function($, canvas, status, controls){
     var self = {};
     self.ctx = null;
     
     // Maze obj constructor
     var Maze = function(start_x, start_y, end_x, end_y, rects, width, height) {
-        //this.img_src = img_src;
-        //this.img;
         this.rects = rects;
         this.start_x = start_x;
         this.start_y = start_y;
@@ -51,14 +43,11 @@ var GA = (function($, canvas, status, controls){
                 var curPoint = points[cur];
                 var nextPoint = points[next];
                 
-                var collided = this.lineIntersectsRect(curPoint, nextPoint, el, er, et, eb)
+                var collided = this.lineIntersectsRect(curPoint, nextPoint, el, er, et, eb);
                 if (collided) {
                     // if we havent yet uncollided this obsctacle,
                     // i.e., the path went in and out of this obstable
-                    //if (!hasCollided) {
-                        ret++;
-                        console.log('collision!');
-                    //}
+                    ret++;
                     hasCollided = true;
                 } else {
                     hasCollided = false;
@@ -66,15 +55,11 @@ var GA = (function($, canvas, status, controls){
             }
             
         }
-        console.log('RET IS:' + ret);
         return ret;
-    }
+    };
     Maze.prototype.findCollisions = function(points) {
         var ret = 0;
         for (var cur = 0, next = 1; next < points.length; cur++, next++) {
-            var curPoint = points[cur];
-            var nextPoint = points[next];
-            var did = false;
             for (var j = 0; j < this.rects.length; j++) {
                 var p1 = points[cur];
                 var p2 = points[next];
@@ -84,14 +69,14 @@ var GA = (function($, canvas, status, controls){
                     er = r[0] + r[2],
                     eb = r[1] + r[3];
                     
-                // Total up teh percent of intersection
+                // Total up the percent of intersection
                 var percent = this.lineIntersectsRect(p1, p2, el, er, et, eb);
                 
                 // Length between p1 and p2
                 var d = Math.sqrt(  Math.pow((p2[0] - p1[0]),2) + 
                                     Math.pow((p2[1] - p1[1]),2));
                 
-                ret += (percent * d)
+                ret += (percent * d);
             }
         }
         return ret;
@@ -105,12 +90,12 @@ var GA = (function($, canvas, status, controls){
             p,q,r;
                 
         for (var edge = 0; edge < 4; edge++) {
-            if (edge==0) {  p = -dx;  q = -(el - p1[0]); }
+            if (edge===0) {  p = -dx;  q = -(el - p1[0]); }
             if (edge==1) {  p = dx;   q =  (er - p1[0]); }
             if (edge==2) {  p = -dy;  q = -(eb - p1[1]); }
             if (edge==3) {  p = dy;   q =  (et - p1[1]); }   
             r = q/p;
-            if (p==0 && q<0) {
+            if (p===0 && q<0) {
                 return 0;   // Don't draw line at all. (parallel line outside)
             }
 
@@ -128,17 +113,10 @@ var GA = (function($, canvas, status, controls){
                 }
             }
         }
-        
-        /*
-        var x0clip = x0src + t0*xdelta;
-        var y0clip = y0src + t0*ydelta;
-        var x1clip = x0src + t1*xdelta;
-        var y1clip = y0src + t1*ydelta;
-        */
+
         // Return the percentage of this line that intersects,
-        // t1-10
         return Math.abs(t1-t0);
-    }
+    };
     
     self.updateProbs = function() {
         // decrease chance of random mttn, increase chance of small/flip
@@ -149,12 +127,14 @@ var GA = (function($, canvas, status, controls){
             self.mutateProbs.FLIP       *= 1.0005;
             self.mutateProbs.SMALL      *= 1.0005;
         }
-    }
+    };
+    
+    // Initial Mutation probabilities
     self.mutateProbs = {
         SMALL : 0.05, 
         FLIP : 0.025, 
         RANDOM : 0.025
-    }
+    };
     
     // Individual Path stuff
     var Path = function(angles) {
@@ -203,23 +183,9 @@ var GA = (function($, canvas, status, controls){
         var nAngles = 20 + Math.floor(Math.random()*30);
         var start_end_points = [[self.maze.start_x, self.maze.start_y], [self.maze.end_x, self.maze.end_y]];
         
-        // Occaisionally, the root left or right could be null, which really 
-        // messes up the path, so ensure we actually have path which has both 
-        // left and right children
         var ret = null;
-        var x = 0;
         while (!ret || (!ret.leftChild || !ret.rightChild)) {
-            if (x > 0) {
-                x = 0;
-            }
             ret = this.generateAnglesHelper(start_end_points, nAngles);
-            
-            if (!ret.leftChild) {
-                x++;
-            }
-            if (!ret.rightChild) {
-                x++;
-            }
         }
         return ret;
     };
@@ -376,15 +342,17 @@ var GA = (function($, canvas, status, controls){
         var p = 1/ this.path_angles.size();
         var newAngles = this.path_angles.clone();
         var ret = null;
-        var first = true;
         newAngles.preorderTraverse(function(node) {
             var prob = Math.random();
             if (prob < p) {
-                // change between -15 and +15
+                var change;
+
                 while (true) {
-                    var change = -15 + Math.floor(Math.random()*30);
+                    // change between -15 and +15
+                    change = -15 + Math.floor(Math.random()*30);
+
                     // disallow changing the angle to 0
-                    if ((node.data + change) % 360 != 0) {
+                    if ((node.data + change) % 360 !== 0) {
                         break;
                     }
                 }
@@ -404,10 +372,13 @@ var GA = (function($, canvas, status, controls){
         newAngles.preorderTraverse(function(node) {
             var prob = Math.random();
             if (prob < p) {
+                var change;
+
                 while (true) {
-                    var change = Math.floor(Math.random()*360);
+                    change = Math.floor(Math.random()*360);
+
                     // disallow changing the angle to 0
-                    if (change != 0) {
+                    if (change !== 0) {
                         break;
                     }
                 }
@@ -439,54 +410,16 @@ var GA = (function($, canvas, status, controls){
 
     // Available mazes
     var m1 = [[173,0,45,32],[0,66,218,32],[474,0,43,161],[173,82,45,79],[196,98,107,33],[389,98,116,33],[0,195,389,32],[474,195,43,64],[496,195,151,32],[0,292,130,32],[217,292,386,32],[344,317,45,171],[173,357,44,131],[344,317,45,171],[376,389,199,33],[560,357,43,96]];
-    
-    var m21 = [[0,0,525,61] ,[0,61,34,371] ,[493,61,32,371] ,[0,432,525,61] ,[194,61,17,28] ,[69,133,53,27] ,[265,117,69,30] ,[300,147,34,70] ,[334,175,54,42] ,[265,190,35,27] ,[354,217,33,15] ,[354,232,70,15] ,[334,247,54,14] ,[159,247,70,27] ,[194,274,35,100] ,[300,347,34,42] ,[334,362,36,70]];
-    var m2 = [[0,0,525,61] ,[0,61,34,371] ,[493,61,32,371] ,[0,432,525,61] ,[194,61,17,28] ,[69,133,53,27] ,[265,117,69,30] ,[300,147,34,70] ,[334,175,54,42] ,[265,190,35,27] ,[354,217,33,15] ,[354,232,70,15] ,[334,247,54,14] ,[50,247,170,27] ,[194,274,35,160] ,[300,347,34,42] ,[334,362,36,70]];
-    var m3 = [[127,79,357,47], [127,126,47,168], [437,126,47,168]];
-    //var m1 = [ [400,100, 100, 100] ];
+    var m2 = [[0,0,525,61] ,[0,61,34,371] ,[493,61,32,371] ,[0,432,525,61] ,[194,61,17,28] ,[69,133,53,27] ,[265,117,69,30] ,[300,147,34,70] ,[334,175,54,42] ,[265,190,35,27] ,[354,217,33,15] ,[354,232,70,15] ,[334,247,54,14] ,[159,247,70,27] ,[194,274,35,100] ,[300,347,34,42] ,[334,362,36,70]];
+    var m3 = [[0,0,525,61] ,[0,61,34,371] ,[493,61,32,371] ,[0,432,525,61] ,[194,61,17,28] ,[69,133,53,27] ,[265,117,69,30] ,[300,147,34,70] ,[334,175,54,42] ,[265,190,35,27] ,[354,217,33,15] ,[354,232,70,15] ,[334,247,54,14] ,[50,247,170,27] ,[194,274,35,160] ,[300,347,34,42] ,[334,362,36,70]];
+    var m4 = [[127,79,357,47], [127,126,47,168], [437,126,47,168]];
     var mazes = [
-                    new Maze(89,389, 436,103, m21, 525, 493)
-                    //new Maze(89,389, 436,103, m2, 525, 493)
-                  //  new Maze(20,473, 635,16, m1, 647, 488)
-                    //new Maze(299,30, 304,180, m3, 647, 488)
+                    new Maze(20,473, 635,16, m1, 647, 488),
+                    new Maze(89,389, 436,103, m2, 525, 493),
+                    new Maze(89,389, 436,103, m3, 525, 493),
+                    new Maze(299,30, 304,180, m4, 647, 488)
                 ];
-    
-    // Preloading awesomeness
-    var preload = {
-        // http://blog.152.org/2008/01/javascript-image-preloader.html
-        count: 0,
-        loaded: 0,
-        onComplete: function () {},
-        loaded_image: "",
-        done_mazes: [],
-        incoming: [],
-        queue: function (mazes) {
-            this.loaded = 0;
-            this.done_mazes = [];
-            this.count = mazes.length;
-            this.incoming = mazes;
-            this.process_queue();
-        },
-        process_queue: function () {
-            this.load(this.incoming.shift());
-        },
-        load: function (maze) {
-            var this_ref = this;
-            maze.img = new Image();
-            
-            maze.img.onload = function () {
-                this_ref.done_mazes.push(maze);
-                this_ref.loaded += 1;
-                if (this_ref.count == this_ref.loaded) {
-                    (this_ref.onComplete)();
-                } else {
-                    this_ref.process_queue();
-                }
-            };
-            maze.img.src = maze.img_src;
-        }
-    };
-    
+
     // GA stuff
     self.population = [];
     self.startPopSize = 40;
@@ -497,7 +430,7 @@ var GA = (function($, canvas, status, controls){
     };
     self.toggleDrawFittest = function() {
         self.drawFittest = !self.drawFittest;
-    }
+    };
     self.start = function (which_maze, popSize) {
         // Initialise the maze and population, and draw for the first time
         popSize = popSize || self.startPopSize; 
@@ -582,10 +515,12 @@ var GA = (function($, canvas, status, controls){
         self.updateStatus();
         
         // Stats
-        self.logStats()
+        self.logStats();
         
         // Again
-        setTimeout(function() {self.run();}, 0);
+        setTimeout(function() {
+            self.run();
+        }, 0);
     };
     
     self.updateStatus = function() {
@@ -598,7 +533,7 @@ var GA = (function($, canvas, status, controls){
     
     self.stats = {
         FITNESS_OVER_TIME : [],
-        FITTEST_FITNESS : [],
+        FITTEST_FITNESS : []
     };
     self.logStats = function() {
         var avg = 0;
@@ -617,11 +552,11 @@ var GA = (function($, canvas, status, controls){
         }
         
         self.stats.FITTEST_FITNESS.push([self.generation, self.fittest.fitness]);
-    }
+    };
     
     self.showStats = function() {
-        $('#stats').html(self.stats.FITNESS_OVER_TIME);
-    }
+        $('#stats').html(self.stats.FITNESS_OVER_TIME.toString());
+    };
     
     self.init = function(which_maze) {
         var this_ref = this;
@@ -731,91 +666,19 @@ var GA = (function($, canvas, status, controls){
         return ret;
     };
     BinaryTree.prototype.trim = function(depth) {
-    depth = depth || 0;
-    
-    if (depth >= 6) {
-        // remove children, no need to recurse further
-        this.leftChild = null;
-        this.rightChild = null;
-    } else {    
-        if (this.leftChild) {
-            this.leftChild.trim(depth+1);
-        }
-        if (this.rightChild) {
-            this.rightChild.trim(depth+1);
-        }
-    }
-    }
-    BinaryTree.prototype.subTreeCrossoverEdge = function (that) {
-        // first clone (need to clone both as we use parts of both)
-        var thisClone = this.clone();
-        var thatClone = that.clone();
-    
-        // pick an edge in this and in that to crossover, -1 since there is 1 less edge than points
-        var thisPoint = Math.floor(Math.random() * (thisClone.size()-1));
-        var thatPoint = Math.floor(Math.random() * (thatClone.size()-1));
-
-        // Traverse this until we find the edge we want to cut at
-        var this_node_link = thisClone.findEdgeGivenCutPoint(thisPoint);
-        var that_node_link = thatClone.findEdgeGivenCutPoint(thisPoint);
+        depth = depth || 0;
         
-        if (this_node_link.length == 1) {
-            // randomly pick
-            if (Math.random() > 0.5) {
-                this_node_link[0].leftChild = that_node_link[0];
-            } else {
-                this_node_link[0].rightChild = that_node_link[0];
+        if (depth >= 6) {
+            // remove children, no need to recurse further
+            this.leftChild = null;
+            this.rightChild = null;
+        } else {    
+            if (this.leftChild) {
+                this.leftChild.trim(depth+1);
             }
-        } else if (this_node_link[1] === 0) {
-            // replace left child
-            this_node_link[0].leftChild = that_node_link[0];
-        } else if (this_node_link[1] === 1){
-            // replace right child
-            this_node_link[0].rightChild = that_node_link[0];
-        } else {
-            throw "CrossoverException"
-            console.log(this_node_link);
-        }
-        
-        return thisClone;
-    };
-    BinaryTree.prototype.findEdgeGivenCutPoint = function (cutPoint, indent) {
-        indent = indent || "";
-        var node = this;
-        
-        if (this.leftChild) {
-            cutPoint--;
-            if (cutPoint <= 0) {
-                return [this,0];
+            if (this.rightChild) {
+                this.rightChild.trim(depth+1);
             }
-            cutPoint = this.leftChild.findEdgeGivenCutPoint(cutPoint,indent+"    ");
-            // ew, if the recursion resulting in finding a cutpoint, bubble back up
-            if (!typeof cutPoint.length == "undefined") {
-                return cutPoint;
-            }            
-        }
-        if (this.rightChild) {
-            cutPoint--;
-            if (cutPoint <= 0) {
-                return [this,1];
-            }
-            cutPoint = this.rightChild.findEdgeGivenCutPoint(cutPoint,indent+"    ");
-            // double ew, if the recursion resulting in finding a cutpoint, bubble back up
-            if (!typeof cutPoint.length == "undefined") {
-                return cutPoint;
-            }   
-        }
-        
-        // If we've got to the end of this branch, and cupoint
-        // isn't 0, then this means the cutpoint is in another branch
-        // and so will be found by recursing elsewhere, so we need to return
-        // the decremented value of cutPoint
-        if (cutPoint) {
-            return cutPoint
-        } else {
-            // Otherwise, if cutPoint is now 0, then we happen to be at a leaf
-            // node
-            return [this];
         }
     };
     BinaryTree.prototype.subTreeCrossover = function(that) {
@@ -832,13 +695,13 @@ var GA = (function($, canvas, status, controls){
         
         // Iterate through until we find the nodes we want...
         thisClone.preorderTraverse(function(node){
-            if ( thisPointIndex == 0 ) {
+            if ( thisPointIndex === 0 ) {
                 thisNode = node;
             }
             thisPointIndex--;
         });
         thatClone.preorderTraverse(function(node){
-            if ( thatPointIndex == 0 ) {
+            if ( thatPointIndex === 0 ) {
                 thatNode = node;
             } 
             thatPointIndex--;
@@ -859,7 +722,7 @@ var GA = (function($, canvas, status, controls){
         }
 
         return thisClone;
-    }
+    };
     BinaryTree.prototype.pprint = function() {
         var str = "[" + this.data;
         if (this.leftChild) {
