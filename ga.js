@@ -48,36 +48,6 @@ var GA = (function($, canvas, status, controls){
         ctx.strokeStyle = "rgb(0,0,0)";
         ctx.strokeRect(0,0,this.width, this.height);
     };
-    // How many times does the path collide with each obstacle?
-    Maze.prototype.findCollisions3 = function(points) {
-        var ret = 0;
-        for (var j = 0; j < this.rects.length; j++) {
-            var r = this.rects[j];
-            var el = r[0],
-                et = r[1],
-                er = r[0] + r[2],
-                eb = r[1] + r[3];
-            
-            var hasCollided = false;
-            console.log('new obst:' + el + ' ' + et);
-            for (var cur = 0, next = 1; next < points.length; cur++, next++) {
-                var curPoint = points[cur];
-                var nextPoint = points[next];
-                
-                var collided = this.lineIntersectsRect(curPoint, nextPoint, el, er, et, eb);
-                if (collided) {
-                    // if we havent yet uncollided this obsctacle,
-                    // i.e., the path went in and out of this obstable
-                    ret++;
-                    hasCollided = true;
-                } else {
-                    hasCollided = false;
-                }
-            }
-            
-        }
-        return ret;
-    };
     Maze.prototype.findCollisions = function(points, doCount) {
         var ret = 0;
         for (var cur = 0, next = 1; next < points.length; cur++, next++) {
