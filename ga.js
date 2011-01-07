@@ -37,9 +37,13 @@ var GA = (function($, canvas, status, controls){
         ctx.fillRect(this.end_x - 5, this.end_y - 5,10,10);
         
         ctx.fillStyle = "rgb(0,0,0)";
+        var group, rect;
         for (var i =0 ; i < this.rects.length; i++) {
-            var r = this.rects[i];
-            ctx.fillRect(r[0],r[1],r[2],r[3]);
+            group = this.rects[i];
+            for (var j = 0; j < group.length; j++) {
+                rect = group[j];
+                ctx.fillRect(rect[0],rect[1],rect[2],rect[3]);
+            }
         }
         ctx.strokeStyle = "rgb(0,0,0)";
         ctx.strokeRect(0,0,this.width, this.height);
@@ -74,26 +78,45 @@ var GA = (function($, canvas, status, controls){
         }
         return ret;
     };
-    Maze.prototype.findCollisions = function(points) {
+    Maze.prototype.findCollisions = function(points, doCount) {
         var ret = 0;
         for (var cur = 0, next = 1; next < points.length; cur++, next++) {
             for (var j = 0; j < this.rects.length; j++) {
                 var p1 = points[cur];
                 var p2 = points[next];
-                var r = this.rects[j];
-                var el = r[0],
-                    et = r[1],
-                    er = r[0] + r[2],
-                    eb = r[1] + r[3];
-                    
-                // Total up the percent of intersection
-                var percent = this.lineIntersectsRect(p1, p2, el, er, et, eb);
                 
-                // Length between p1 and p2
-                var d = Math.sqrt(  Math.pow((p2[0] - p1[0]),2) + 
-                                    Math.pow((p2[1] - p1[1]),2));
+                var group = this.rects[j];
+                var rect;
+                var hasCollidedWithGroup = false;
                 
-                ret += (percent * d);
+                for (var k = 0; k < group.length; k++) {
+                    rect = group[k];
+
+                    var el = rect[0],
+                        et = rect[1],
+                        er = rect[0] + rect[2],
+                        eb = rect[1] + rect[3];
+
+                    // Total up the percent of intersection
+                    var percent = this.lineIntersectsRect(p1, p2, el, er, et, eb);
+
+                    if (percent) {
+                        // Either count intersections, or measure intersection
+                        if (self.doCount) {
+                            if (!hasCollidedWithGroup) {
+                                ret++;
+                                hasCollidedWithGroup = true;
+                            }
+                        } else {
+                            // Length between p1 and p2
+                            var d = Math.sqrt(  Math.pow((p2[0] - p1[0]),2) + 
+                                                Math.pow((p2[1] - p1[1]),2));
+
+                            // Total up the intersection
+                            ret += (percent * d);
+                        }
+                    }
+                }
             }
         }
         return ret;
@@ -318,15 +341,17 @@ var GA = (function($, canvas, status, controls){
             //}
         }
         
-        var collisions = self.maze.findCollisions(this.points);
+        var collisions = self.maze.findCollisions(this.points, true);
         //console.log("collisions: ", collisions);
+
+        // If feasibile, fitness is length, if not feasible, fitness is intersections
         if (collisions || !this.allPointsValid()) {
             this.feasible = false;
+            this.fitness = -collisions;
         } else {
             this.feasible = true;
+            this.fitness = -(a1*distance + a2*collisions); // inverse to enable GT comparisons
         }
-        
-        this.fitness = -(a1*distance + a2*collisions); // inverse to enable GT comparisons
     };
     
     Path.prototype.draw = function(ctx) {
@@ -453,22 +478,49 @@ var GA = (function($, canvas, status, controls){
     // A feasible path will always be fitter than a non-feasible path.
     Path.prototype.compare = function(that) {
         if (this.feasible && that.feasible) {
+            // both feasible, compare on length
             return (this.fitness > that.fitness);
         } else if(this.feasible) {
             return true;
         } else if(that.feasible) {
             return false;
         } else {
-            // Both unfeasible
+            // Both unfeasible, compare only intersections
             return (this.fitness > that.fitness);
         }
     }
 
     // Available mazes
-    var m1 = [[173,0,45,32],[0,66,218,32],[474,0,43,161],[173,82,45,79],[196,98,107,33],[389,98,116,33],[0,195,389,32],[474,195,43,64],[496,195,151,32],[0,292,130,32],[217,292,386,32],[344,317,45,171],[173,357,44,131],[344,317,45,171],[376,389,199,33],[560,357,43,96]];
-    var m2 = [[0,0,525,61] ,[0,61,34,371] ,[493,61,32,371] ,[0,432,525,61] ,[194,61,17,28] ,[69,133,53,27] ,[265,117,69,30] ,[300,147,34,70] ,[334,175,54,42] ,[265,190,35,27] ,[354,217,33,15] ,[354,232,70,15] ,[334,247,54,14] ,[159,247,70,27] ,[194,274,35,100] ,[300,347,34,42] ,[334,362,36,70]];
-    var m3 = [[0,0,525,61] ,[0,61,34,371] ,[493,61,32,371] ,[0,432,525,61] ,[194,61,17,28] ,[69,133,53,27] ,[265,117,69,30] ,[300,147,34,70] ,[334,175,54,42] ,[265,190,35,27] ,[354,217,33,15] ,[354,232,70,15] ,[334,247,54,14] ,[50,247,170,27] ,[194,274,35,160] ,[300,347,34,42] ,[334,362,36,70]];
-    var m4 = [[127,79,357,47], [127,126,47,168], [437,126,47,168]];
+    // x,y, Width, Height
+    var m1 = [
+            [[173,0,45,32]],
+            [[0,66,218,32], [173,82,45,79], [196,98,107,33]],
+            [[474,0,43,161], [389,98,116,33]],
+            [[0,195,389,32]],
+            [[474,195,43,64], [496,195,151,32]],
+            [[0,292,130,32]],
+            [[173,357,44,131]],
+            [[217,292,386,32], [344,317,45,171], [344,317,45,171], [376,389,199,33], [560,357,43,96]],
+        ];
+    var m2 = [
+            [[0,0,525,61] ,[0,61,34,371] ,[493,61,32,371] ,[0,432,525,61]],
+            [[194,61,17,28]],
+            [[69,133,53,27]],
+            [[265,117,69,30], [300,147,34,70], [334,175,54,42], [265,190,35,27], [354,217,33,15], [354,232,70,15], [334,247,54,14]],
+            [[159,247,70,27], [194,274,35,100]], 
+            [[300,347,34,42] ,[334,362,36,70]]
+        ];
+    var m3 = [
+            [[0,0,525,61], [0,61,34,371], [493,61,32,371] ,[0,432,525,61]],
+            [[194,61,17,28]],
+            [[69,133,53,27]],
+            [[265,117,69,30], [300,147,34,70], [334,175,54,42], [265,190,35,27], [354,217,33,15], [354,232,70,15], [334,247,54,14]],
+            [[50,247,170,27], [194,274,35,160]],
+            [[300,347,34,42] ,[334,362,36,70]]
+        ];
+    var m4 = [
+            [[127,79,357,47], [127,126,47,168], [437,126,47,168]]
+        ];
     self.mazes = [
                     new Maze(20,473, 635,16, m1, 647, 488, "Corridor-like environment."),
                     new Maze(89,389, 436,103, m2, 525, 493, "Sparse environment."),
