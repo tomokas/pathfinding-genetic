@@ -727,6 +727,14 @@ var GA = (function($, canvas, status, controls){
         $('#stats').html(self.stats.FITNESS_OVER_TIME.toString());
     };
     
+    self.recalcPathStartEnd = function() {
+        for (var i = 0; i < self.population.length; i++) {
+            var p = self.population[i];
+            p.points = [];
+            p.calcFitness();
+        }
+    };
+
     self.init = function() {
         var this_ref = this;
         
@@ -817,6 +825,36 @@ var GA = (function($, canvas, status, controls){
                     regen.click();
                 }
             });
+
+        // Set up handlers for the canvas
+        $(canvas).mousedown(function(e){
+            var x = e.offsetX,
+                y = e.offsetY;
+            if (x > self.maze.start_x - 5 && x < self.maze.start_x + 5 &&
+                y > self.maze.start_y -5 && y < self.maze.start_y + 5) {
+                self.isDraggingStart = true;
+            } else if (x > self.maze.end_x - 5 && x < self.maze.end_x + 5 &&
+                y > self.maze.end_y -5 && y < self.maze.end_y + 5) {
+                self.isDraggingEnd = true;
+            }
+        });
+        $(canvas).mouseup(function(){
+            self.isDraggingStart = false;
+            self.isDraggingEnd = false;
+        });
+        $(canvas).mousemove(function(e){
+            var x = e.offsetX,
+                y = e.offsetY;
+            if (self.isDraggingStart) {
+                self.maze.start_x = x;
+                self.maze.start_y = y;
+                self.recalcPathStartEnd();
+            } else if (self.isDraggingEnd) {
+                self.maze.end_x = x;
+                self.maze.end_y = y;
+                self.recalcPathStartEnd();
+            }
+        });
         this_ref.start();
     };
     
