@@ -154,6 +154,11 @@ var GA = (function($, canvas, status, controls){
         this.col = '#' + Math.round(0xffffff * Math.random()).toString(16);
         this.start = [self.maze.start_x, self.maze.start_y];
         this.end = [self.maze.end_x, self.maze.end_y];
+
+        // Constraints, in priority order:
+        // is the path entirely inside
+        this.contained = false;
+        // Does the path not intersect with any obstacles
         this.feasible = true;
 
         this.mutateFns = {
@@ -314,8 +319,14 @@ var GA = (function($, canvas, status, controls){
         var collisions = self.maze.findCollisions(this.points, true);
         //console.log("collisions: ", collisions);
 
+        if (this.allPointsValid()) {
+            this.contained = true;
+        } else {
+            this.contained = false;
+        }
+
         // If feasibile, fitness is length, if not feasible, fitness is intersections
-        if (collisions || !this.allPointsValid()) {
+        if (collisions) {
             this.feasible = false;
             this.fitness = -collisions;
         } else {
@@ -445,17 +456,27 @@ var GA = (function($, canvas, status, controls){
     };
     
     // Compare the path to other, 1 if this is fittest, -1 if that is fittest, 0 if it's a draw
+    // A contained path will always be fitter than a non-contained path
     // A feasible path will always be fitter than a non-feasible path.
     Path.prototype.compare = function(that) {
-        if (this.feasible && that.feasible) {
-            // both feasible, compare on length
-            return (this.fitness > that.fitness);
-        } else if(this.feasible) {
+        if (this.contained && that.contained) {
+            if (this.feasible && that.feasible) {
+                // both feasible, compare on length
+                return (this.fitness > that.fitness);
+            } else if(this.feasible) {
+                return true;
+            } else if(that.feasible) {
+                return false;
+            } else {
+                // Both unfeasible, compare only intersections
+                return (this.fitness > that.fitness);
+            }
+        } else if (this.contained) {
             return true;
-        } else if(that.feasible) {
+        } else if (that.contained) {
             return false;
         } else {
-            // Both unfeasible, compare only intersections
+            // Both not contained, go by fitness
             return (this.fitness > that.fitness);
         }
     }
