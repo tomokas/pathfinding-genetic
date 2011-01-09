@@ -48,7 +48,37 @@ var GA = (function($, canvas, status, controls){
         ctx.strokeStyle = "rgb(0,0,0)";
         ctx.strokeRect(0,0,this.width, this.height);
     };
-    Maze.prototype.findCollisions = function(points, doCount) {
+    Maze.prototype.arePointsInFreeSpace = function(points) {
+        // Make into array
+        points = (typeof points.length != 'undefined') ? [points] : points;
+        
+        var group, rect, i,j,k;
+
+        for (i = 0; i < this.rects.length; i++) {
+            group = this.rects[i];
+            for (j = 0; j < group.length; j++) {
+                rect = group[j];
+                
+                for (k = 0; k < points.length; k++) {
+                
+                    if (this.isPointInRect(points[k])) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    };
+    Maze.prototype.isPointInRect = function(el, er, et, eb, p) {
+        var x = p[0],
+            y = p[1];
+        return ((x > el) && (x < er)) && ((y > et) && (y < eb))
+    };
+    Maze.prototype.findCollisions = function(points, type) {
+        // type = 0 : amount of intersection. Default.
+        // type = 1 : number of collisions
+        // type = 2 : amount of intersection IF the intersection amount if the path
+        //            is cutting a corner, otherwise number of collisions
         var ret = 0;
         for (var cur = 0, next = 1; next < points.length; cur++, next++) {
             for (var j = 0; j < this.rects.length; j++) {
@@ -68,23 +98,46 @@ var GA = (function($, canvas, status, controls){
                         eb = rect[1] + rect[3];
 
                     // Total up the percent of intersection
-                    var percent = this.lineIntersectsRect(p1, p2, el, er, et, eb);
+                    var percent = this.lineIntersectsRect(p1, p2, el, er, et, eb, true);
 
-                    if (percent) {
+                    if (percent[0] > 0) {
                         // Either count intersections, or measure intersection
-                        if (self.doCount) {
-                            if (!hasCollidedWithGroup) {
-                                ret++;
-                                hasCollidedWithGroup = true;
-                            }
-                        } else {
-                            // Length between p1 and p2
-                            var d = Math.sqrt(  Math.pow((p2[0] - p1[0]),2) + 
-                                                Math.pow((p2[1] - p1[1]),2));
+                        switch (type) {
+                            case 1:
+                                if (!hasCollidedWithGroup) {
+                                    ret++;
+                                    hasCollidedWithGroup = true;
+                                    console.log('!hascollidedWithGroup', ret);
+                                }
+                                break;
+                            case 2:
+                                //0 = L, 1 = R, 2 = B, 3 = T
+                                var s1 = percent[1][0],
+                                    s2 = percent[1][1];
+                                // Valid diagonal combinations:
+                                // LT, LB
+                                // RT, RB
+                                
+                                // If it's a diagonal, and p1 and p2 in free space
+                                if ((s1===0||s1==1) && (s2==2||s2==3) && this.arePointsInFreeSpace([p1,p2])){
+                                    // fitness is the amount it's corner cutting
+                                    ret += (percent[0] * d);
+                                } else {
+                                    // If not a diagonal, fitness has to be much worse
+                                    ret += 1000;
+                                }
+                                break
+                            default:
+                                // Length between p1 and p2
+                                var d = Math.sqrt(  Math.pow((p2[0] - p1[0]),2) + 
+                                                    Math.pow((p2[1] - p1[1]),2));
 
-                            // Total up the intersection
-                            ret += (percent * d);
+                                // Total up the intersection
+                                console.log('percent*d', (percent[0] * d));
+                                ret += (percent[0] * d);
+                                break;
                         }
+                            
                     }
                 }
             }
@@ -93,12 +146,14 @@ var GA = (function($, canvas, status, controls){
     };
     // Liang-Barsky clipping
     // modified from: http://www.skytopia.com/project/articles/compsci/clipping.html
-    Maze.prototype.lineIntersectsRect = function(p1,p2, el, er, eb, et) {
+    Maze.prototype.lineIntersectsRect = function(p1,p2, el, er, eb, et, returnSides) {
         var dx = p2[0] - p1[0],
             dy = p2[1] - p1[1],
             t0 = 0.0, t1 = 1.0,
-            p,q,r;
-                
+            p,q,r,sides=[];
+        // if returnSides is set, return a 2-element array with the two sides
+        // corresponding to which sides the path intersected at.
+
         for (var edge = 0; edge < 4; edge++) {
             if (edge===0) {  p = -dx;  q = -(el - p1[0]); }
             if (edge==1) {  p = dx;   q =  (er - p1[0]); }
@@ -106,26 +161,32 @@ var GA = (function($, canvas, status, controls){
             if (edge==3) {  p = dy;   q =  (et - p1[1]); }   
             r = q/p;
             if (p===0 && q<0) {
-                return 0;   // Don't draw line at all. (parallel line outside)
+                return [0];   // Don't draw line at all. (parallel line outside)
             }
 
             if (p<0) {
                 if (r>t1) {
-                    return 0;         // Don't draw line at all.
+                    return [0];         // Don't draw line at all.
                 } else if (r>t0) {
                     t0=r;            // Line is clipped!
+                    sides.push(edge);
                 }
             } else if (p>0) {
                 if (r<t0) {
-                    return 0;      // Don't draw line at all.
+                    return [0];      // Don't draw line at all.
                 } else if (r<t1) {
                     t1=r;         // Line is clipped!
+                    sides.push(edge);
                 }
             }
         }
 
         // Return the percentage of this line that intersects,
-        return Math.abs(t1-t0);
+        if (returnSides) {
+            return [Math.abs(t1-t0), sides];
+        } else {
+            return [Math.abs(t1-t0)];
+        }
     };
     
     self.updateProbs = function() {
@@ -298,8 +359,6 @@ var GA = (function($, canvas, status, controls){
     };
     
     Path.prototype.calcFitness = function() {
-        var a1 = 1;
-        var a2 = 10;
         if (!this.points.length) {
             this.calcPointsFromAngles();
         }
@@ -310,14 +369,9 @@ var GA = (function($, canvas, status, controls){
             
             // distance
             distance += Math.sqrt( Math.pow((nextPoint[0] - curPoint[0]),2) + Math.pow((nextPoint[1] - curPoint[1]),2));
-            
-            //if (! this.isValidPoint( curPoint )) {
-            //    distance += 1000000;
-            //}
         }
         
         var collisions = self.maze.findCollisions(this.points, true);
-        //console.log("collisions: ", collisions);
 
         if (this.allPointsValid()) {
             this.contained = true;
@@ -331,7 +385,7 @@ var GA = (function($, canvas, status, controls){
             this.fitness = -collisions;
         } else {
             this.feasible = true;
-            this.fitness = -(a1*distance + a2*collisions); // inverse to enable GT comparisons
+            this.fitness = -(distance); // inverse to enable GT comparisons
         }
     };
     
@@ -462,14 +516,14 @@ var GA = (function($, canvas, status, controls){
         if (this.contained && that.contained) {
             if (this.feasible && that.feasible) {
                 // both feasible, compare on length
-                return (this.fitness > that.fitness);
+                return (this.fitness >= that.fitness);
             } else if(this.feasible) {
                 return true;
             } else if(that.feasible) {
                 return false;
             } else {
                 // Both unfeasible, compare only intersections
-                return (this.fitness > that.fitness);
+                return (this.fitness >= that.fitness);
             }
         } else if (this.contained) {
             return true;
@@ -477,7 +531,7 @@ var GA = (function($, canvas, status, controls){
             return false;
         } else {
             // Both not contained, go by fitness
-            return (this.fitness > that.fitness);
+            return (this.fitness >= that.fitness);
         }
     }
 
@@ -589,7 +643,7 @@ var GA = (function($, canvas, status, controls){
                     sum += self.sharingFn(self.population[i], self.population[j]);
                 }
                 if (sum > 0) {
-                    sharedFitness = self.population[i].fitness / sum;
+                    sharedFitness = Math.pow(self.population[i].fitness,2) / sum;
                 } else {
                     sharedFitness = self.population[i].fitness;
                 }
@@ -695,7 +749,7 @@ var GA = (function($, canvas, status, controls){
     self.updateStatus = function() {
         var str = "Generation: " + self.generation + "</br>";
         for (var i = 0; i < self.population.length; i++) {
-            str += i + " Fitness:" + self.population[i].fitness + self.population[i].path_angles.size() + '::' + self.population[i].path_angles.pprint() + '</br>';
+            str += i + " Fitness:" + self.population[i].fitness + '::' + self.population[i].path_angles.pprint() + '</br>';
         }
         $(status).html(str);
     };
@@ -747,7 +801,7 @@ var GA = (function($, canvas, status, controls){
         var b = $('<button type="button"></button>').appendTo(controls)
             .text('Start');
         var g = $('<input type="text"/>').appendTo(controls)
-            .val('500');
+            .val('50000');
         b.click(function(){
             self.generation = self.generation || 0;
             self.generationLimit = self.generationLimit + parseInt(g.val(),10);
@@ -825,6 +879,8 @@ var GA = (function($, canvas, status, controls){
                     regen.click();
                 }
             });
+        
+        crowding.click();
 
         // Set up handlers for the canvas
         $(canvas).mousedown(function(e){
