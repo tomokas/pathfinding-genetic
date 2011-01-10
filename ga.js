@@ -29,6 +29,33 @@ var GA = (function($, canvas, status, controls){
         this.height = height;
         this.desc = desc;
     };
+    Maze.prototype.setupBorderCoords = function() {
+        // y - y1 = m(x-x1)
+        this.start_edge_x = 0;
+        this.start_edge_y = this.grad()*(- this.start_x) + this.start_y;
+
+        // x = width
+        this.end_edge_x = this.width;
+        this.end_edge_y = this.grad()*(this.width - this.start_x) + this.start_y;
+    }
+    Maze.prototype.xParaFn = function(t){
+        this.start_edge_x = 0;
+        this.start_edge_y = this.grad()*(- this.start_x) + this.start_y;
+
+        return (this.start_edge_x + t*(this.end_edge_x - this.start_edge_x)) 
+    };
+    Maze.prototype.yParaFn = function(t){ 
+        this.end_edge_x = this.width;
+        this.end_edge_y = this.grad()*(this.width - this.start_x) + this.start_y;
+
+        return (this.start_edge_y + t*(this.end_edge_y - this.start_edge_y)) 
+    };
+    Maze.prototype.grad = function() {
+        return ((this.end_y - this.start_y) / (this.end_x - this.start_x));
+    };
+    Maze.prototype.negGrad = function() {
+        return -(1/this.grad());
+    };
     Maze.prototype.draw = function(ctx) {
         ctx.fillStyle = "rgb(255,0,0)";
         ctx.fillRect(this.start_x - 5, this.start_y - 5,10,10);
@@ -493,15 +520,104 @@ var GA = (function($, canvas, status, controls){
         return ret;
     };
     
-    // Phenotypic distance of one path from another
-    Path.prototype.distance = function(that) {
-        // Find shortest path length
-        var len = Math.min(this.points.length, that.points.length),
-            i, totalDist = 0;
-        for (i = 0; i < len; i++) {
-            totalDist += this.euclideanDistance(this.points[i], that.points[i]);
+    // http://www.kevlindev.com/gui/math/intersection/Intersection.js
+    Path.prototype.intersectLineLine = function(a1, a2, b1, b2) {
+        var result = [];
+        
+        var ua_t = (b2.x - b1.x) * (a1.y - b1.y) - (b2.y - b1.y) * (a1.x - b1.x);
+        var ub_t = (a2.x - a1.x) * (a1.y - b1.y) - (a2.y - a1.y) * (a1.x - b1.x);
+        var u_b  = (b2.y - b1.y) * (a2.x - a1.x) - (b2.x - b1.x) * (a2.y - a1.y);
+
+        if ( u_b != 0 ) {
+            var ua = ua_t / u_b;
+            var ub = ub_t / u_b;
+
+            if ( 0 <= ua && ua <= 1 && 0 <= ub && ub <= 1 ) {
+                //result = new Intersection("Intersection");
+                result.push(a1.x + ua * (a2.x - a1.x));
+                result.push(a1.y + ua * (a2.y - a1.y));
+            } else {
+                //result = new Intersection("No Intersection");
+            }
+        } else {
+            if ( ua_t == 0 || ub_t == 0 ) {
+                //result = new Intersection("Coincident");
+            } else {
+                //result = new Intersection("Parallel");
+            }
         }
-        return totalDist;
+
+        return result;
+    };
+
+    
+    self.useNewDistance = false;
+    // Phenotypic distance of one path from another
+    Path.prototype.getDistanceFromPerfect = function() {
+        var n = 0, ret = {}, p1=0,p2=1, toInsert = 0;
+        
+        // Every 100th of the line
+        for (var i = 0; i <= 1.0; i+= 0.01) {
+            // Find (x,y) along perfect line
+            var x = self.maze.xParaFn(i),
+                y = self.maze.yParaFn(i);
+
+            // y - y1 = m(x - x1)
+            // Find using x = 0 and x = width
+            var startY = self.maze.negGrad()*(-x) + y;
+            var endY = self.maze.negGrad()*(self.maze.width-x) + y;
+            
+            var a1 = {x:0 , y:startY};
+            var a2 = {x:self.maze.width, y:endY };
+            var res = [];
+            
+            // Iterate along line segments, until we find an intersection
+            for (p1 = 0, p2=1; p2 < this.points.length; p1++, p2++) {
+                res = this.intersectLineLine(a1,a2, 
+                    {x:this.points[p1][0], y:this.points[p1][1]}, 
+                    {x:this.points[p2][0], y:this.points[p2][1]});
+                if (res.length) 
+                    break;
+            }
+            if (res.length === 0) {
+                //console.log('No intersection!');
+            } else {
+                toInsert = this.euclideanDistance(res, [x,y]);
+                self.ctx.fillRect(res[0]-2,res[1]-2,4,4);
+            }
+            ret[i] = toInsert;
+            
+            //self.ctx.strokeStyle = '#f00';
+            //self.ctx.moveTo(0,startY);
+            //self.ctx.lineTo(self.maze.width, endY);
+            //self.ctx.stroke();
+            //self.ctx.moveTo(self.maze.start_x,self.maze.start_y);
+            //self.ctx.lineTo(self.maze.end_x,self.maze.end_y);
+            //self.ctx.stroke();
+        }
+        
+        return ret;
+    }
+    Path.prototype.distance = function(that) {
+        if (self.useNewDistance) {
+            var d1 = this.getDistanceFromPerfect(),
+                d2 = that.getDistanceFromPerfect(),
+                ret = 0;
+            for (var k in d1) {
+                ret += Math.abs(d1[k] - d2[k]);
+            }
+            //console.log(d1,d2,ret);
+            //console.log("---");
+            return ret;
+        } else {
+            // Find shortest path length
+            var len = Math.min(this.points.length, that.points.length),
+                i, totalDist = 0;
+            for (i = 0; i < len; i++) {
+                totalDist += this.euclideanDistance(this.points[i], that.points[i]);
+            }
+            return totalDist;
+        }
     };
     
     Path.prototype.euclideanDistance = function(p1, p2) {
