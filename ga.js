@@ -107,7 +107,6 @@ var GA = (function($, canvas, status, controls){
                                 if (!hasCollidedWithGroup) {
                                     ret++;
                                     hasCollidedWithGroup = true;
-                                    console.log('!hascollidedWithGroup', ret);
                                 }
                                 break;
                             case 2:
@@ -371,7 +370,7 @@ var GA = (function($, canvas, status, controls){
             distance += Math.sqrt( Math.pow((nextPoint[0] - curPoint[0]),2) + Math.pow((nextPoint[1] - curPoint[1]),2));
         }
         
-        var collisions = self.maze.findCollisions(this.points, true);
+        var collisions = self.maze.findCollisions(this.points, 1);
 
         if (this.allPointsValid()) {
             this.contained = true;
@@ -608,6 +607,7 @@ var GA = (function($, canvas, status, controls){
     self.paused = false;
     self.crowding = false;
     self.sharing = false;
+    self.rog = false;
     self.sharingRadius = 50;
 
     // Sharing function
@@ -622,6 +622,18 @@ var GA = (function($, canvas, status, controls){
         return ret;
     }
 
+    self.offspringGeneration = function(par1, par2) {
+        if (self.rog && (par1.distance(par2) < 50)) {
+            // same genotype, random replace
+            c1 = par1; // keep one in the population
+            c2 = new Path(); // randomly generate a new Path
+        } else {
+            var crossoverResult = par1.crossoverWith(par2);
+            c1 = crossoverResult[0].mutate();
+            c2 = crossoverResult[1].mutate();
+        }
+        return [c1, c2];
+    };
     self.run = function() {
         if (self.generation >= self.generationLimit || self.paused) {
             return;
@@ -664,7 +676,7 @@ var GA = (function($, canvas, status, controls){
                 p1 = self.population[i];
                 p2 = self.population[i+1];
 
-                var crossoverResult = p1.crossoverWith(p2);
+                var crossoverResult = self.offspringGeneration(p1,p2);
                 c1 = crossoverResult[0].mutate();
                 c2 = crossoverResult[1].mutate();
 
@@ -679,19 +691,19 @@ var GA = (function($, canvas, status, controls){
         } else {
             // Selection
             var newPaths = [];
-            for (var i = 0; i< 15; i++) {
+            //for (var i = 0; i< 15; i++) {
                 var p1cand = [Math.floor(Math.random() * self.population.length), Math.floor(Math.random() * self.population.length)];
                 var p2cand = [Math.floor(Math.random() * self.population.length), Math.floor(Math.random() * self.population.length)];
 
-                var par1 = (self.population[p1cand[0]].compare(self.population[p1cand[1]])) ? self.population[p1cand[0]] : self.population[p1cand[1]];
-                var par2 = (self.population[p2cand[0]].compare(self.population[p2cand[1]])) ? self.population[p2cand[0]] : self.population[p2cand[1]];
+                var p1 = (self.population[p1cand[0]].compare(self.population[p1cand[1]])) ? self.population[p1cand[0]] : self.population[p1cand[1]];
+                var p2 = (self.population[p2cand[0]].compare(self.population[p2cand[1]])) ? self.population[p2cand[0]] : self.population[p2cand[1]];
 
-                var crossoverResult = par1.crossoverWith(par2);
-                var c1 = crossoverResult[0].mutate(),
-                    c2 = crossoverResult[1].mutate();
+                var children = self.offspringGeneration(p1,p2);
+                var c1 = children[0].mutate(),
+                    c2 = children[1].mutate();
                 newPaths.push(c1);
                 newPaths.push(c2);
-            }
+            //}
 
             // Find (unique) indices of unfit paths to replace
             var indicesToReplace = [];
@@ -851,6 +863,15 @@ var GA = (function($, canvas, status, controls){
             }, function(){
                 self.sharing = !self.sharing;
                 sharing.text('Toggle: Sharing off');
+            });
+        var rog = $('<button type="button"></button>').appendTo(controls)
+            .text('Toggle: rog off')
+            .toggle(function(){
+                self.rog = !self.rog;
+                rog.text('Toggle: rog on');
+            }, function(){
+                self.rog = !self.rog;
+                rog.text('Toggle: rog off');
             });
         $('<br/><br/>').appendTo(controls);
         var stats = $('<button type="button"></button>').appendTo(controls)
