@@ -807,7 +807,7 @@ var GA = (function($, canvas, status, controls){
         } else {
             // Selection
             var newPaths = [];
-            //for (var i = 0; i< 15; i++) {
+            for (var i = 0; i< 15; i++) {
                 var p1cand = [Math.floor(Math.random() * self.population.length), Math.floor(Math.random() * self.population.length)];
                 var p2cand = [Math.floor(Math.random() * self.population.length), Math.floor(Math.random() * self.population.length)];
 
@@ -819,7 +819,7 @@ var GA = (function($, canvas, status, controls){
                     c2 = children[1].mutate();
                 newPaths.push(c1);
                 newPaths.push(c2);
-            //}
+            }
 
             // Find (unique) indices of unfit paths to replace
             var indicesToReplace = [];
