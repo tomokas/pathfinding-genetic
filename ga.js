@@ -411,7 +411,7 @@ var GA = (function($, canvas, status, controls){
             this.fitness = -collisions;
         } else {
             this.feasible = true;
-            this.fitness = -(distance); // inverse to enable GT comparisons
+            this.fitness = -(1-Math.abs(1/distance)); // inverse to enable GT comparisons
         }
     };
     
