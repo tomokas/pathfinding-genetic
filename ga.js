@@ -724,6 +724,7 @@ var GA = (function($, canvas, status, controls){
     self.crowding = false;
     self.sharing = false;
     self.rog = false;
+    self.hillclimber = false;
     self.sharingRadius = 50;
 
     // Sharing function
@@ -737,7 +738,17 @@ var GA = (function($, canvas, status, controls){
 
         return ret;
     }
-
+    self.toggleHillclimber = function() {
+        self.hillclimber = !self.hillclimber;
+        
+        if (self.hillclimber) {
+            self.reset();
+            self.clearAndDrawEnv();
+            self.start(1);
+        } else {
+            self.regen.click();
+        }
+    }
     self.offspringGeneration = function(par1, par2) {
         if (self.rog && (par1.distance(par2) < 50)) {
             // same genotype, random replace
@@ -750,6 +761,10 @@ var GA = (function($, canvas, status, controls){
         }
         return [c1, c2];
     };
+    self.clearAndDrawEnv = function() {
+        self.ctx.clearRect(0, 0, 1024, 1024);
+        self.maze.draw(self.ctx);
+    };
     self.run = function() {
         if (self.generation >= self.generationLimit || self.paused) {
             return;
@@ -757,94 +772,102 @@ var GA = (function($, canvas, status, controls){
         self.generation++;
         self.updateProbs();
 
-        // Fitness sharing
-        if (self.sharing) {
-            for (var i = 0; i < self.population.length; i++) {
-                // f_{share}(i) = f_{raw}(i) / Sigma_{j=1}^{N} = sh(d_{ij})
-                var sharedFitness;
-                var sum = 0;
-
-                for (var j = 0; j < self.population.length; j++) {
-                    // A path can't share with itself
-                    if (i===j) continue;
-
-                    sum += self.sharingFn(self.population[i], self.population[j]);
-                }
-                if (sum > 0) {
-                    sharedFitness = Math.pow(self.population[i].fitness,2) / sum;
-                } else {
-                    sharedFitness = self.population[i].fitness;
-                }
-                self.population[i].sharedFitness = sharedFitness;
-            }
-
-            for (i = 0; i < self.population.length; i++) {
-                self.population[i].fitness = self.population[i].sharedFitness;
-            }
-        }
-        
-        // If crowding is in use, otherwise just perform normal selection
-        if (self.crowding) {
-            self.population.shuffle();
-
-            var i, p1, p2, c1, c2;
-            for (i = 0; i < self.population.length-1; i += 2) {
-                p1 = self.population[i];
-                p2 = self.population[i+1];
-
-                var crossoverResult = self.offspringGeneration(p1,p2);
-                c1 = crossoverResult[0].mutate();
-                c2 = crossoverResult[1].mutate();
-
-                if ( (p1.distance(c1) + p2.distance(c2)) <= (p1.distance(c2) + p2.distance(c1))) {
-                    (c1.compare(p1)) && (self.population[i]   = c1);
-                    (c2.compare(p2)) && (self.population[i+1] = c2);
-                } else {
-                    (c2.compare(p1)) && (self.population[i]   = c2);
-                    (c1.compare(p2)) && (self.population[i+1] = c1);
-                }
+        // Hillclimber or GA
+        if (self.hillclimber) {
+            var oldPath = self.population[0];
+            var newPath = oldPath.mutate();
+            if (newPath.compare(oldPath)) {
+                self.population[0] = newPath;
             }
         } else {
-            // Selection
-            var newPaths = [];
-            for (var i = 0; i< 15; i++) {
-                var p1cand = [Math.floor(Math.random() * self.population.length), Math.floor(Math.random() * self.population.length)];
-                var p2cand = [Math.floor(Math.random() * self.population.length), Math.floor(Math.random() * self.population.length)];
+            // Fitness sharing
+            if (self.sharing) {
+                for (var i = 0; i < self.population.length; i++) {
+                    // f_{share}(i) = f_{raw}(i) / Sigma_{j=1}^{N} = sh(d_{ij})
+                    var sharedFitness;
+                    var sum = 0;
 
-                var p1 = (self.population[p1cand[0]].compare(self.population[p1cand[1]])) ? self.population[p1cand[0]] : self.population[p1cand[1]];
-                var p2 = (self.population[p2cand[0]].compare(self.population[p2cand[1]])) ? self.population[p2cand[0]] : self.population[p2cand[1]];
+                    for (var j = 0; j < self.population.length; j++) {
+                        // A path can't share with itself
+                        if (i===j) continue;
 
-                var children = self.offspringGeneration(p1,p2);
-                var c1 = children[0].mutate(),
-                    c2 = children[1].mutate();
-                newPaths.push(c1);
-                newPaths.push(c2);
-            }
-
-            // Find (unique) indices of unfit paths to replace
-            var indicesToReplace = [];
-            for (i = 0; i< newPaths.length; i++) {
-                while (true) {
-                    var a = Math.floor( Math.random() * self.population.length );
-                    var b = Math.floor( Math.random() * self.population.length );
-                    var toReplace = self.population[a] > self.population[b] ? b : a;
-
-                    if ( $.inArray(toReplace, indicesToReplace) == -1) {
-                        indicesToReplace.push(toReplace);
-                        break;
+                        sum += self.sharingFn(self.population[i], self.population[j]);
                     }
+                    if (sum > 0) {
+                        sharedFitness = Math.pow(self.population[i].fitness,2) / sum;
+                    } else {
+                        sharedFitness = self.population[i].fitness;
+                    }
+                    self.population[i].sharedFitness = sharedFitness;
+                }
+
+                for (i = 0; i < self.population.length; i++) {
+                    self.population[i].fitness = self.population[i].sharedFitness;
                 }
             }
+            
+            // If crowding is in use, otherwise just perform normal selection
+            if (self.crowding) {
+                self.population.shuffle();
 
-            // Reinsert back into population
-            for (i = 0; i< indicesToReplace.length; i++) {
-                self.population[indicesToReplace[i]] = newPaths[i];
+                var i, p1, p2, c1, c2;
+                for (i = 0; i < self.population.length-1; i += 2) {
+                    p1 = self.population[i];
+                    p2 = self.population[i+1];
+
+                    var crossoverResult = self.offspringGeneration(p1,p2);
+                    c1 = crossoverResult[0].mutate();
+                    c2 = crossoverResult[1].mutate();
+
+                    if ( (p1.distance(c1) + p2.distance(c2)) <= (p1.distance(c2) + p2.distance(c1))) {
+                        (c1.compare(p1)) && (self.population[i]   = c1);
+                        (c2.compare(p2)) && (self.population[i+1] = c2);
+                    } else {
+                        (c2.compare(p1)) && (self.population[i]   = c2);
+                        (c1.compare(p2)) && (self.population[i+1] = c1);
+                    }
+                }
+            } else {
+                // Selection
+                var newPaths = [];
+                for (var i = 0; i< 15; i++) {
+                    var p1cand = [Math.floor(Math.random() * self.population.length), Math.floor(Math.random() * self.population.length)];
+                    var p2cand = [Math.floor(Math.random() * self.population.length), Math.floor(Math.random() * self.population.length)];
+
+                    var p1 = (self.population[p1cand[0]].compare(self.population[p1cand[1]])) ? self.population[p1cand[0]] : self.population[p1cand[1]];
+                    var p2 = (self.population[p2cand[0]].compare(self.population[p2cand[1]])) ? self.population[p2cand[0]] : self.population[p2cand[1]];
+
+                    var children = self.offspringGeneration(p1,p2);
+                    var c1 = children[0].mutate(),
+                        c2 = children[1].mutate();
+                    newPaths.push(c1);
+                    newPaths.push(c2);
+                }
+
+                // Find (unique) indices of unfit paths to replace
+                var indicesToReplace = [];
+                for (i = 0; i< newPaths.length; i++) {
+                    while (true) {
+                        var a = Math.floor( Math.random() * self.population.length );
+                        var b = Math.floor( Math.random() * self.population.length );
+                        var toReplace = self.population[a] > self.population[b] ? b : a;
+
+                        if ( $.inArray(toReplace, indicesToReplace) == -1) {
+                            indicesToReplace.push(toReplace);
+                            break;
+                        }
+                    }
+                }
+
+                // Reinsert back into population
+                for (i = 0; i< indicesToReplace.length; i++) {
+                    self.population[indicesToReplace[i]] = newPaths[i];
+                }
             }
         }
         
         // Drawing
-        self.ctx.clearRect(0, 0, 1024, 1024);
-        self.maze.draw(self.ctx);
+        self.clearAndDrawEnv();
                 
         // Draw pop
         var min = null;
@@ -929,7 +952,7 @@ var GA = (function($, canvas, status, controls){
         var b = $('<button type="button"></button>').appendTo(controls)
             .text('Start');
         var g = $('<input type="text"/>').appendTo(controls)
-            .val('50000');
+            .val('100000');
         b.click(function(){
             self.generation = self.generation || 0;
             self.generationLimit = self.generationLimit + parseInt(g.val(),10);
@@ -946,7 +969,7 @@ var GA = (function($, canvas, status, controls){
         $('<br/>').appendTo(controls);
         var p = $('<input type="text"/>').appendTo(controls)
             .val(self.startPopSize);
-        var regen = $('<button type="button"></button>').appendTo(controls)
+        self.regen = $('<button type="button"></button>').appendTo(controls)
             .text('Regen+Reset')
             .click(function(){
                 self.reset();
@@ -989,6 +1012,15 @@ var GA = (function($, canvas, status, controls){
                 self.rog = !self.rog;
                 rog.text('Toggle: rog off');
             });
+        var hillclimber = $('<button type="button"></button>').appendTo(controls)
+            .text('Toggle: Hillclimber off')
+            .toggle(function(){
+                self.toggleHillclimber();
+                hillclimber.text('Toggle: Hillclimber on');
+            }, function(){
+                self.toggleHillclimber();
+                hillclimber.text('Toggle: Hillclimber off');
+            });
         $('<br/><br/>').appendTo(controls);
         var stats = $('<button type="button"></button>').appendTo(controls)
             .text('Show/Update stats')
@@ -1005,7 +1037,7 @@ var GA = (function($, canvas, status, controls){
             .click(function(){
                 if ((self.whichMaze - 1) >= 0) {
                     self.whichMaze--;
-                    regen.click();
+                    self.regen.click();
                 }
             });
         var nextMaze = $('<button type="button"></button>').appendTo(controls)
@@ -1013,7 +1045,7 @@ var GA = (function($, canvas, status, controls){
             .click(function(){
                 if ((self.whichMaze + 1) < (self.mazes.length)) {
                     self.whichMaze++;
-                    regen.click();
+                    self.regen.click();
                 }
             });
         
